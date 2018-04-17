@@ -7,11 +7,52 @@ import com.facebook.GraphResponse
 import com.inspirationdriven.fbphotochanger.model.fb.AlbumMeta
 import com.inspirationdriven.fbphotochanger.model.fb.Picture
 import com.inspirationdriven.fbphotochanger.model.fb.User
+import io.reactivex.Flowable
 import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.SingleEmitter
+import io.reactivex.processors.BehaviorProcessor
 import org.json.JSONArray
 import org.json.JSONObject
+
+
+class Page<out T>(val payload: T, val next: String?)
+
+val nextPage = { after: String ->
+    getPage(GraphRequest(token, me.photosUri)
+            .addParams("type" to "uploaded")
+            .addParams{it.putInt("limit", 4)}, after).toSingle()
+            .map {
+                val root = it.jsonObject
+                val arr = root["data"] as JSONArray
+                val ids = arr.map { it.getString("id") }
+
+                //val hasPaging = root.has("paging")
+                val hasNext = root.optJSONObject("paging")?.has("next") ?: false
+                val cursorAfter = if (hasNext) root.getJSONObject("paging").getJSONObject("cursors").getString("after") else null
+                Page(ids, cursorAfter)
+            }.toFlowable()
+
+}
+
+fun getPage(graphRequest: GraphRequest, cursor: String? = null): GraphRequest{
+    return graphRequest.apply {
+        if (cursor != null)
+            this.addParams("after" to cursor)
+    }
+}
+
+fun test(): Flowable<String> {
+    val processor = BehaviorProcessor.createDefault<String>("")
+    return processor.concatMap(nextPage)
+            .doOnNext {
+                if (it.next != null)
+                    processor.onNext(it.next)
+                else
+                    processor.onComplete()
+            }
+            .concatMapIterable { t -> t.payload }
+}
 
 fun getProfilePicture(desiredWidth: Int = 200) = GraphRequest(token,
         me.profilePictureUri)
@@ -41,7 +82,8 @@ fun getPhotosOfMe(): Single<Pair<AlbumMeta, Picture>> = GraphRequest(token, me.p
             }
         }
 
-fun getAlbumPhotos(album: AlbumMeta, imgSize: Int): Observable<Pair<Picture, Picture>> = GraphRequest(token, album.photosUri).toSingle()
+fun getAlbumPhotos(album: AlbumMeta, imgSize: Int): Observable<Pair<Picture, Picture>> = GraphRequest(token, album.photosUri)
+        .toSingle()
         .flatMapObservable { response: GraphResponse ->
             createObservable(response.jsonObject["data"] as JSONArray, {
                 it.getString("id")
@@ -138,8 +180,8 @@ private var token: AccessToken
     }
     set(v) = TODO()
 
-private fun JSONArray.map(function: (JSONObject) -> Any?): List<Any?> {
-    return ArrayList<Any?>().apply {
+private fun <T> JSONArray.map(function: (JSONObject) -> T?): List<T?> {
+    return ArrayList<T?>().apply {
         for (i in 0 until length())
             add(function.invoke(getJSONObject(i)))
     }

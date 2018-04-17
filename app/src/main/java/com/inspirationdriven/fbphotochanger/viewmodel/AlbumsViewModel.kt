@@ -16,7 +16,6 @@ class AlbumsViewModel : ViewModel() {
                 .startWith(getPhotosOfMe().toObservable())
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .doOnSubscribe { }
                 .map { Album(it.first, it.second) }
                 .toList()
                 .subscribe({ albums.value = it }, { e -> e.printStackTrace() })
