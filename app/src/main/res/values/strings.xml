@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">fbphotochanger</string>
+    <string name="facebook_app_id">214089146019315</string>
+    <string name="fb_login_protocol_scheme">fb214089146019315</string>
+    <string name="action_open_editor">Open editor</string>
+    <string name="action_open_collection">Open collection</string>
+</resources>
