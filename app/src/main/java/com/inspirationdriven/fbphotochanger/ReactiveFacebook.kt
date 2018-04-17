@@ -32,7 +32,7 @@ fun getPhotosOfMe(): Single<Pair<AlbumMeta, Picture>> = GraphRequest(token, me.p
         }
         .flatMap { meta: AlbumMeta ->
             val picSingle = if (meta.explicitThumbnailUri != null)
-                getPicture(meta.thumbnailUri)
+                getPicture(meta.thumbnailUri, DEFAULT_IMG_SIZE)
             else
                 Single.create<Picture> { it.onSuccess(Picture(null)) }
 
@@ -41,12 +41,12 @@ fun getPhotosOfMe(): Single<Pair<AlbumMeta, Picture>> = GraphRequest(token, me.p
             }
         }
 
-fun getAlbumPhotos(album: AlbumMeta): Observable<Pair<Picture, Picture>> = GraphRequest(token, album.photosUri).toSingle()
+fun getAlbumPhotos(album: AlbumMeta, imgSize: Int): Observable<Pair<Picture, Picture>> = GraphRequest(token, album.photosUri).toSingle()
         .flatMapObservable { response: GraphResponse ->
             createObservable(response.jsonObject["data"] as JSONArray, {
                 it.getString("id")
             })
-        }.flatMap { getPictures(it).toObservable() }
+        }.flatMap { getPictures(it, imgSize).toObservable() }
 
 fun getAlbumList() =
         GraphRequest(token, me.albumsUri)
@@ -65,7 +65,7 @@ fun getAlbums(): Observable<Pair<AlbumMeta, Picture>> {
     return getAlbumList().flatMap({ t: AlbumMeta -> getAlbumPicture(t).toObservable() }, { t1: AlbumMeta, t2: Picture -> t1 to t2 })
 }
 
-private fun getPicture(fbId: String, imgSize: Int = 320): Single<Picture> = GraphRequest(token, fbId)
+private fun getPicture(fbId: String, imgSize: Int): Single<Picture> = GraphRequest(token, fbId)
         .addParams("fields" to "images")
         .toSingle().map {
             val imgList = it.jsonObject.getJSONArray("images")
@@ -75,7 +75,7 @@ private fun getPicture(fbId: String, imgSize: Int = 320): Single<Picture> = Grap
             Picture(imgList.sortedBy { it.first }.first { it.first >= imgSize }.second)
         }
 
-private fun getPictures(fbId: String, imgSize: Int = 320): Single<Pair<Picture, Picture>> = GraphRequest(token, fbId)
+private fun getPictures(fbId: String, imgSize: Int): Single<Pair<Picture, Picture>> = GraphRequest(token, fbId)
         .addParams("fields" to "images")
         .toSingle().map {
             val imgList = it.jsonObject.getJSONArray("images")
@@ -131,7 +131,7 @@ private fun GraphRequest.addParams(injector: (Bundle) -> Unit): GraphRequest {
 }
 
 private val me = User.me()
-
+const val DEFAULT_IMG_SIZE = 320
 private var token: AccessToken
     get() {
         return AccessToken.getCurrentAccessToken()

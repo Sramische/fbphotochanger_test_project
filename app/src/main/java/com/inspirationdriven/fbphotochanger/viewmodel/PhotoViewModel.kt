@@ -54,3 +54,9 @@ fun ImageView.setImageUrl(url: String?) {
         Picasso.with(context).load(it).into(this)
     }
 }
+@BindingAdapter("imageUrlCropped")
+fun ImageView.setImageUrlCropped(url: String?) {
+    url?.let {
+        Picasso.with(context).load(it).fit().centerCrop().into(this)
+    }
+}
