@@ -15,45 +15,6 @@ import io.reactivex.processors.BehaviorProcessor
 import org.json.JSONArray
 import org.json.JSONObject
 
-
-class Page<out T>(val payload: T, val next: String?)
-
-val nextPage = { after: String ->
-    getPage(GraphRequest(token, me.photosUri)
-            .addParams("type" to "uploaded")
-            .addParams{it.putInt("limit", 4)}, after).toSingle()
-            .map {
-                val root = it.jsonObject
-                val arr = root["data"] as JSONArray
-                val ids = arr.map { it.getString("id") }
-
-                //val hasPaging = root.has("paging")
-                val hasNext = root.optJSONObject("paging")?.has("next") ?: false
-                val cursorAfter = if (hasNext) root.getJSONObject("paging").getJSONObject("cursors").getString("after") else null
-                Page(ids, cursorAfter)
-            }.toFlowable()
-
-}
-
-fun getPage(graphRequest: GraphRequest, cursor: String? = null): GraphRequest{
-    return graphRequest.apply {
-        if (cursor != null)
-            this.addParams("after" to cursor)
-    }
-}
-
-fun test(): Flowable<String> {
-    val processor = BehaviorProcessor.createDefault<String>("")
-    return processor.concatMap(nextPage)
-            .doOnNext {
-                if (it.next != null)
-                    processor.onNext(it.next)
-                else
-                    processor.onComplete()
-            }
-            .concatMapIterable { t -> t.payload }
-}
-
 fun getProfilePicture(desiredWidth: Int = 200) = GraphRequest(token,
         me.profilePictureUri)
         .addParams("redirect" to "false")
@@ -83,8 +44,8 @@ fun getPhotosOfMe(): Single<Pair<AlbumMeta, Picture>> = GraphRequest(token, me.p
         }
 
 fun getAlbumPhotos(album: AlbumMeta, imgSize: Int): Observable<Pair<Picture, Picture>> = GraphRequest(token, album.photosUri)
-        .toSingle()
-        .flatMapObservable { response: GraphResponse ->
+        .toPagedObservable()
+        .flatMap { response: GraphResponse ->
             createObservable(response.jsonObject["data"] as JSONArray, {
                 it.getString("id")
             })
@@ -93,8 +54,8 @@ fun getAlbumPhotos(album: AlbumMeta, imgSize: Int): Observable<Pair<Picture, Pic
 fun getAlbumList() =
         GraphRequest(token, me.albumsUri)
                 .addParams("fields" to "photo_count,id,name")
-                .toSingle()
-                .flatMapObservable { response: GraphResponse ->
+                .toPagedObservable()
+                .flatMap { response: GraphResponse ->
                     createObservable(response.jsonObject["data"] as JSONArray, {
                         AlbumMeta(
                                 it.getString("id"),
@@ -148,6 +109,16 @@ private fun <T> createObservable(jsonArray: JSONArray, mapper: (JSONObject) -> T
         it.onComplete()
     }
 }
+
+private fun GraphRequest.toPagedObservable(): Observable<GraphResponse> = this.toSingle()
+        .toObservable()
+        .concatMap {
+            val next = it.getRequestForPagedResults(GraphResponse.PagingDirection.NEXT)
+            if (next == null)
+                Observable.just(it)
+            else
+                Observable.just(it).concatWith(next.toPagedObservable())
+        }
 
 private fun GraphRequest.toSingle() = Single.create { emitter: SingleEmitter<GraphResponse> ->
     val response = executeAndWait()
