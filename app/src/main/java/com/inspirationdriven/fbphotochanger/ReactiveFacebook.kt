@@ -4,15 +4,18 @@ import android.os.Bundle
 import com.facebook.AccessToken
 import com.facebook.GraphRequest
 import com.facebook.GraphResponse
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.inspirationdriven.fbphotochanger.model.LargeImage
+import com.inspirationdriven.fbphotochanger.model.Thumbnail
 import com.inspirationdriven.fbphotochanger.model.fb.AlbumMeta
-import com.inspirationdriven.fbphotochanger.model.fb.Picture
 import com.inspirationdriven.fbphotochanger.model.fb.User
-import io.reactivex.Flowable
+import com.inspirationdriven.fbphotochanger.model.fb.gson.Album
+import com.inspirationdriven.fbphotochanger.model.fb.gson.ListRoot
+import com.inspirationdriven.fbphotochanger.model.fb.gson.Picture
 import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.SingleEmitter
-import io.reactivex.processors.BehaviorProcessor
-import org.json.JSONArray
 import org.json.JSONObject
 
 fun getProfilePicture(desiredWidth: Int = 200) = GraphRequest(token,
@@ -24,91 +27,61 @@ fun getProfilePicture(desiredWidth: Int = 200) = GraphRequest(token,
             (it.jsonObject["data"] as JSONObject).getString("url")
         }
 
-fun getPhotosOfMe(): Single<Pair<AlbumMeta, Picture>> = GraphRequest(token, me.photosUri)
-        .addParams("type" to "uploaded")
-        .toSingle()
+class Id(val id: String)
+
+fun getPhotosOfMe(): Single<Pair<AlbumMeta, Thumbnail>> = GraphRequest(token, me.photosUri)
+        .addParams("type" to "tagged", "fields" to "id")
+        .toPagedObservable()
         .map {
-            val arr = it.jsonObject["data"] as JSONArray
-            val imgId = if (arr.length() > 0) (arr[0] as JSONObject).getString("id") else null
-            AlbumMeta(null, "Photos of Me", arr.length(), me.photosUri, imgId)
-        }
+            val list = gson.fromJson<ListRoot<Id>>(it.rawResponse, object : TypeToken<ListRoot<Id>>() {}.type).data
+            list.count() to list.firstOrNull()?.id
+        }.scan { t1: Pair<Int, String?>, t2: Pair<Int, String?> -> (t1.first + t2.first) to t1.second }
+        .map { AlbumMeta(null, "Photos of Me", it.first, me.photosUri, it.second) }
+        .last(AlbumMeta("", "Photos of Me", 0))
         .flatMap { meta: AlbumMeta ->
             val picSingle = if (meta.explicitThumbnailUri != null)
                 getPicture(meta.thumbnailUri, DEFAULT_IMG_SIZE)
             else
-                Single.create<Picture> { it.onSuccess(Picture(null)) }
+                Single.create<Thumbnail> { it.onSuccess(Thumbnail(null)) }
 
             picSingle.map { t ->
                 meta to t
             }
         }
 
-fun getAlbumPhotos(album: AlbumMeta, imgSize: Int): Observable<Pair<Picture, Picture>> = GraphRequest(token, album.photosUri)
+
+fun getAlbumPhotos(album: AlbumMeta, imgSize: Int): Observable<LargeImage> = GraphRequest(token, album.photosUri)
+        .addParams("fields" to "images")
         .toPagedObservable()
-        .flatMap { response: GraphResponse ->
-            createObservable(response.jsonObject["data"] as JSONArray, {
-                it.getString("id")
-            })
-        }.flatMap { getPictures(it, imgSize).toObservable() }
-
-fun getAlbumList() =
-        GraphRequest(token, me.albumsUri)
-                .addParams("fields" to "photo_count,id,name")
-                .toPagedObservable()
-                .flatMap { response: GraphResponse ->
-                    createObservable(response.jsonObject["data"] as JSONArray, {
-                        AlbumMeta(
-                                it.getString("id"),
-                                it.getString("name"),
-                                it.getInt("photo_count"))
-                    })
-                }
-
-fun getAlbums(): Observable<Pair<AlbumMeta, Picture>> {
-    return getAlbumList().flatMap({ t: AlbumMeta -> getAlbumPicture(t).toObservable() }, { t1: AlbumMeta, t2: Picture -> t1 to t2 })
-}
-
-private fun getPicture(fbId: String, imgSize: Int): Single<Picture> = GraphRequest(token, fbId)
-        .addParams("fields" to "images")
-        .toSingle().map {
-            val imgList = it.jsonObject.getJSONArray("images")
-                    .map {
-                        it.getInt("width") to it.getString("source")
-                    } as List<Pair<Int, String>>
-            Picture(imgList.sortedBy { it.first }.first { it.first >= imgSize }.second)
+        .flatMap {
+            val root = gson.fromJson<ListRoot<Picture>>(it.rawResponse, object : TypeToken<ListRoot<Picture>>() {}.type)
+            Observable.fromArray(*root.data.toTypedArray())
         }
-
-private fun getPictures(fbId: String, imgSize: Int): Single<Pair<Picture, Picture>> = GraphRequest(token, fbId)
-        .addParams("fields" to "images")
-        .toSingle().map {
-            val imgList = it.jsonObject.getJSONArray("images")
-                    .map {
-                        it.getInt("width") to it.getString("source")
-                    } as List<Pair<Int, String>>
-            val sortedList = imgList.sortedBy { it.first }
-            val thumb = Picture(sortedList.first { it.first >= imgSize }.second)
-            val hiresImage = Picture(sortedList.last().second)
-            thumb to hiresImage
-        }
-
-private fun getAlbumPicture(source: AlbumMeta) = GraphRequest(token, source.thumbnailUri)
-        .addParams(
-                "redirect" to "false",
-                "type" to "album")
-        .toSingle().map {
-            Picture((it.jsonObject["data"] as JSONObject).getString("url"))
-        }
-
-private fun <T> createObservable(jsonArray: JSONArray, mapper: (JSONObject) -> T): Observable<T> {
-    return Observable.create<T> {
-        for (item in jsonArray) {
-            with(item as JSONObject) {
-                it.onNext(mapper.invoke(this))
+        .map {
+            with(it.images) {
+                sort()
+                LargeImage(first { it.width >= imgSize }.source, last().source)
             }
         }
-        it.onComplete()
-    }
-}
+
+fun getAlbums(): Observable<Pair<AlbumMeta, Thumbnail>> =
+        GraphRequest(token, me.albumsUri)
+                .addParams("fields" to "photo_count,id,name,picture{url}")
+                .toPagedObservable()
+                .flatMap {
+                    val root = gson.fromJson<ListRoot<Album>>(it.rawResponse, object : TypeToken<ListRoot<Album>>() {}.type)
+                    Observable.fromArray(root.data)
+                }.flatMapIterable { it -> it }
+                .map {
+                    AlbumMeta(it.id, it.name, it.count) to Thumbnail(it.picture.data.url)
+                }
+
+private fun getPicture(fbId: String, imgSize: Int): Single<Thumbnail> = GraphRequest(token, fbId)
+        .addParams("fields" to "images")
+        .toSingle().map {
+            val picture = gson.fromJson<Picture>(it.rawResponse, object : TypeToken<Picture>() {}.type)
+            Thumbnail(picture.images.sorted().first { it.width >= imgSize }.source)
+        }
 
 private fun GraphRequest.toPagedObservable(): Observable<GraphResponse> = this.toSingle()
         .toObservable()
@@ -143,6 +116,7 @@ private fun GraphRequest.addParams(injector: (Bundle) -> Unit): GraphRequest {
     return this
 }
 
+private val gson = Gson()
 private val me = User.me()
 const val DEFAULT_IMG_SIZE = 320
 private var token: AccessToken
@@ -150,16 +124,3 @@ private var token: AccessToken
         return AccessToken.getCurrentAccessToken()
     }
     set(v) = TODO()
-
-private fun <T> JSONArray.map(function: (JSONObject) -> T?): List<T?> {
-    return ArrayList<T?>().apply {
-        for (i in 0 until length())
-            add(function.invoke(getJSONObject(i)))
-    }
-}
-
-private operator fun JSONArray.iterator() = object : Iterator<Any> {
-    private var i = 0
-    override fun hasNext() = i < length()
-    override fun next() = get(i++)
-}

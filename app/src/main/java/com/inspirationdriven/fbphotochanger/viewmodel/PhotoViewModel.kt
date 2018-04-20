@@ -6,6 +6,7 @@ import android.arch.lifecycle.MutableLiveData
 import android.content.Context
 import android.databinding.BindingAdapter
 import android.widget.ImageView
+import com.inspirationdriven.fbphotochanger.R
 import com.inspirationdriven.fbphotochanger.getProfilePicture
 import com.squareup.picasso.Picasso
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -54,9 +55,8 @@ fun ImageView.setImageUrl(url: String?) {
         Picasso.with(context).load(it).into(this)
     }
 }
+
 @BindingAdapter("imageUrlCropped")
 fun ImageView.setImageUrlCropped(url: String?) {
-    url?.let {
-        Picasso.with(context).load(it).fit().centerCrop().into(this)
-    }
+    Picasso.with(context).load(url).fit().centerCrop().placeholder(R.drawable.ic_image_black_24px).into(this)
 }

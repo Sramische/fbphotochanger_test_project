@@ -15,10 +15,13 @@ class ImageListViewModel : ViewModel() {
 
     fun getCollection(a: AlbumMeta): LiveData<List<LargeImage>> {
         data.value = null
-        getAlbumPhotos(a, SCREEN_WIDTH / 3).subscribeOn(Schedulers.io())
+        getAlbumPhotos(a, SCREEN_WIDTH / 3)
+                .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .map { LargeImage(it.first.url!!, it.second.url!!) }
-                .toList()
+                .collect<MutableList<LargeImage>>({ mutableListOf() }, { t1, t2 ->
+                    t1.add(t2)
+                    data.value = t1
+                })
                 .subscribe { t1: MutableList<LargeImage>?, t2: Throwable? -> data.value = t1 }
         return data
     }
