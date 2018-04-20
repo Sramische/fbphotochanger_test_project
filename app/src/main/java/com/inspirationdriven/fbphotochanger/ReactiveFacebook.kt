@@ -25,7 +25,7 @@ fun getProfilePicture(desiredWidth: Int = 200) = GraphRequest(token,
         }
 
 fun getPhotosOfMe(): Single<Pair<AlbumMeta, Picture>> = GraphRequest(token, me.photosUri)
-        .addParams("type" to "tagged")
+        .addParams("type" to "uploaded")
         .toSingle()
         .map {
             val arr = it.jsonObject["data"] as JSONArray
