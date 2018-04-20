@@ -8,7 +8,8 @@ import android.support.v7.app.AppCompatActivity
 import android.view.*
 import com.inspirationdriven.fbphotochanger.R
 import com.inspirationdriven.fbphotochanger.viewmodel.PhotoViewModel
-import com.inspirationdriven.fbphotochanger.viewmodel.setImageUrl
+import com.squareup.picasso.Picasso
+import jp.wasabeef.picasso.transformations.CropCircleTransformation
 import kotlinx.android.synthetic.main.activity_photo.*
 
 class PhotoFragment : Fragment() {
@@ -31,7 +32,7 @@ class PhotoFragment : Fragment() {
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         viewModel.profilePicUrl.observe(this, Observer {
-            imgview_photo.setImageUrl(it)
+            Picasso.with(context).load(it).transform(CropCircleTransformation()).into(imgview_photo)
         })
         (activity as AppCompatActivity).supportActionBar?.apply {
             this.title = arguments?.getString(ThumbnailListFragment.ARG_TITLE) ?: ""
