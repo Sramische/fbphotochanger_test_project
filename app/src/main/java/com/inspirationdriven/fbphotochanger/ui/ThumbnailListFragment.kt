@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.inspirationdriven.fbphotochanger.R
 import com.inspirationdriven.fbphotochanger.model.Thumbnail
+import kotlinx.android.synthetic.main.fragment_album_list.*
 import kotlinx.android.synthetic.main.fragment_album_list.view.*
 
 abstract class ThumbnailListFragment<T : Thumbnail> : Fragment() {
@@ -46,6 +47,11 @@ abstract class ThumbnailListFragment<T : Thumbnail> : Fragment() {
             adapter = thumbnailAdapter
         }
         return view
+    }
+
+    fun showLoading(visible: Boolean){
+        progress_bar.visibility = if(visible) View.VISIBLE else View.INVISIBLE
+        list.visibility = if(visible) View.INVISIBLE else View.VISIBLE
     }
 
     companion object {

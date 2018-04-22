@@ -24,8 +24,9 @@ class AlbumListFragment : ThumbnailListFragment<Album>() {
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        with(ViewModelProviders.of(activity!!)[AlbumsViewModel::class.java]){
+        with(ViewModelProviders.of(activity!!)[AlbumsViewModel::class.java]) {
             albums.observe(this@AlbumListFragment, Observer { thumbnailAdapter.thumbnailsList = it ?: listOf() })
+            loading.observe(this@AlbumListFragment, Observer { showLoading(it ?: false) })
             fetchAlbums()
         }
     }
