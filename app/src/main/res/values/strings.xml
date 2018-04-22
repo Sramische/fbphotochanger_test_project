@@ -4,4 +4,5 @@
     <string name="fb_login_protocol_scheme">fb214089146019315</string>
     <string name="action_open_editor">Open editor</string>
     <string name="action_open_collection">Open collection</string>
+    <string name="no_data">Nothing to show.</string>
 </resources>

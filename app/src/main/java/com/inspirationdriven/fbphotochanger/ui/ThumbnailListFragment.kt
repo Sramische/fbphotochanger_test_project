@@ -10,9 +10,8 @@ import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import com.inspirationdriven.fbphotochanger.R
+import com.inspirationdriven.fbphotochanger.databinding.FragmentAlbumListBinding
 import com.inspirationdriven.fbphotochanger.model.Thumbnail
-import kotlinx.android.synthetic.main.fragment_album_list.*
 import kotlinx.android.synthetic.main.fragment_album_list.view.*
 
 abstract class ThumbnailListFragment<T : Thumbnail> : Fragment() {
@@ -38,7 +37,9 @@ abstract class ThumbnailListFragment<T : Thumbnail> : Fragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
                               savedInstanceState: Bundle?): View? {
-        val view = inflater.inflate(R.layout.fragment_album_list, container, false)
+        val binding = FragmentAlbumListBinding.inflate(inflater, container, false)
+        binding.setLifecycleOwner(this)
+        val view = binding.root//inflater.inflate(R.layout.fragment_album_list, container, false)
         thumbnailAdapter = ThumbnailRecyclerViewAdapter(itemLayout, this::onClick)
 
         with(view.list as RecyclerView) {
@@ -49,12 +50,12 @@ abstract class ThumbnailListFragment<T : Thumbnail> : Fragment() {
         return view
     }
 
-    fun showLoading(visible: Boolean){
-        progress_bar.visibility = if(visible) View.VISIBLE else View.INVISIBLE
-        list.visibility = if(visible) View.INVISIBLE else View.VISIBLE
-    }
-
     companion object {
         const val ARG_TITLE = "title"
     }
+
+    enum class State {
+        LIST, NO_DATA, LOADING, ERROR
+    }
 }
+
