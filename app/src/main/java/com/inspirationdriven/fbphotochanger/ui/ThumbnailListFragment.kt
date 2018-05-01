@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.support.annotation.LayoutRes
 import android.support.v4.app.Fragment
 import android.support.v7.app.AppCompatActivity
-import android.support.v7.widget.DefaultItemAnimator
 import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
@@ -43,7 +42,6 @@ abstract class ThumbnailListFragment<T : Thumbnail> : Fragment() {
         thumbnailAdapter = ThumbnailRecyclerViewAdapter(itemLayout, this::onClick)
 
         with(view.list as RecyclerView) {
-            itemAnimator = DefaultItemAnimator()
             setupList(this)
             adapter = thumbnailAdapter
         }
