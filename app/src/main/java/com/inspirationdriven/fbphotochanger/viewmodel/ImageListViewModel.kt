@@ -13,9 +13,9 @@ import io.reactivex.schedulers.Schedulers
 class ImageListViewModel : ViewModel() {
     val data = MutableLiveData<List<LargeImage>>()
 
-    fun getCollection(a: AlbumMeta): LiveData<List<LargeImage>> {
+    fun getCollection(albumMeta: AlbumMeta): LiveData<List<LargeImage>> {
         data.value = null
-        getAlbumPhotos(a, SCREEN_WIDTH / 3)
+        getAlbumPhotos(albumMeta, SCREEN_WIDTH / 3)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .collect<MutableList<LargeImage>>({ mutableListOf() }, { t1, t2 ->

@@ -14,8 +14,6 @@ import io.reactivex.schedulers.Schedulers
 
 class PhotoViewModel(app: Application) : AndroidViewModel(app) {
     val profilePicUrl = MutableLiveData<String>()
-    val loading = MutableLiveData<Boolean>()
-    val overridenProfilePic = MutableLiveData<String>()
 
     init {
         val p = getApplication<Application>().getSharedPreferences(PhotoViewModel::class.java.simpleName, Context.MODE_PRIVATE)
@@ -25,7 +23,8 @@ class PhotoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun fetchProfilePicture(width: Int, force: Boolean = false) {
         if (profilePicUrl.value != null && !force) return
-        getProfilePicture(width).subscribeOn(Schedulers.io())
+        getProfilePicture(width)
+                .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe({ profilePicUrl.value = it }, { e -> e.printStackTrace() })
     }

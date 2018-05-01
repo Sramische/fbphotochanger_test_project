@@ -1,32 +1,25 @@
 package com.inspirationdriven.fbphotochanger.viewmodel
 
 import android.arch.lifecycle.MutableLiveData
-import com.inspirationdriven.fbphotochanger.getAlbums
-import com.inspirationdriven.fbphotochanger.getPhotosOfMe
+import com.inspirationdriven.fbphotochanger.getAlbumsCombined
 import com.inspirationdriven.fbphotochanger.model.Album
 import com.inspirationdriven.fbphotochanger.ui.ThumbnailListFragment.State
 import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.functions.BiFunction
 import io.reactivex.schedulers.Schedulers
 
 class AlbumsViewModel : ListStateViewModel() {
     val albums = MutableLiveData<List<Album>>()
 
     fun fetchAlbums() {
-        getPhotosOfMe()
-                .toObservable()
-                .zipWith(getAlbums(), BiFunction { t1: MutableList<Album>, t2: List<Album> ->
-                    t1.apply { addAll(t2) }
-                })
+        getAlbumsCombined()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .collect<MutableList<Album>>({ mutableListOf() }, { t1, t2 ->
-                    t1.addAll(t2)
-                })
                 .doOnSubscribe { albums.value ?: state.setValue(State.LOADING) }
-                .doOnSuccess { state.value = if (it.isEmpty()) State.NO_DATA else State.LIST }
+                .doFinally { state.value = if (albums.value?.isEmpty() != false) State.NO_DATA else State.LIST }
                 .subscribe({
                     albums.value = it
-                }, { state.value = State.ERROR })
+                }, {
+                    state.value = State.ERROR
+                })
     }
 }
